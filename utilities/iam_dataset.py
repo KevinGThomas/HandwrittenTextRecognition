@@ -173,7 +173,7 @@ class IAMDataset(dataset.ArrayDataset):
         img_arr
         An image converted to an array
         '''
-        print("Pre Processing Image")
+        #print("Pre Processing Image")
         im = cv2.imread(img_in, cv2.IMREAD_GRAYSCALE)
         if np.size(im) == 1: # skip if the image data is corrupt.
             return None
@@ -211,7 +211,7 @@ class IAMDataset(dataset.ArrayDataset):
             A numpy array of the output requested (text or the bounding box)
         '''
         
-        print("Get output data")
+        #print("Get output data")
         output_data = []
         if self._output_data == "text":
             if self._parse_method in ["form", "form_bb", "form_original"]:
