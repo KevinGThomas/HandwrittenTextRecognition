@@ -74,13 +74,10 @@ class IAMDataset(dataset.ArrayDataset):
             assert output_parse_method in _parse_methods, error_message
             self._output_parse_method = output_parse_method
             
-            #self.image_data_file_name = os.path.join(root, "image_data-{}-{}-{}*.h5".format(
-            #    self._parse_method, self._output_data, self._output_parse_method))
-            #self.image_data_file_name = os.path.join(root, "image_data-{}-{}-{}*.plk".format(
-            #    self._parse_method, self._output_data, self._output_parse_method))
-        #else:
-            #self.image_data_file_name = os.path.join(root, "image_data-{}-{}*.h5".format(self._parse_method, self._output_data))
-        #    self.image_data_file_name = os.path.join(root, "image_data-{}-{}*.plk".format(self._parse_method, self._output_data))
+            self.image_data_file_name = os.path.join(root, "image_data-{}-{}-{}*.plk".format(
+                self._parse_method, self._output_data, self._output_parse_method))
+        else:
+            self.image_data_file_name = os.path.join(root, "image_data-{}-{}*.plk".format(self._parse_method, self._output_data))
 
         self._root = root
         #if not os.path.isdir(root):
@@ -103,12 +100,16 @@ class IAMDataset(dataset.ArrayDataset):
         '''
         
         print("Get data")
+        
+        '''
 
-        #if len(glob.glob(self.image_data_file_name)) > 0:
-        #    logging.info("Loading data from pickle")
-        #    images_data = self._load_dataframe_chunks(self.image_data_file_name)
-        #else:
-        images_data = self._process_data()
+        if len(glob.glob(self.image_data_file_name)) > 0:
+            logging.info("Loading data from pickle")
+            images_data = self._load_dataframe_chunks(self.image_data_file_name)
+        else:
+            images_data = self._process_data()
+        '''
+        images_data = self._process_data() #comment this line if using pickle
 
         # Extract train or test data out
         train_subjects, test_subjects = self._process_subjects()
@@ -138,8 +139,9 @@ class IAMDataset(dataset.ArrayDataset):
             tree = ET.parse(xml_file)
             root = tree.getroot()
             height, width = int(root.attrib["height"]), int(root.attrib["width"])
-            for item in root.iter(self._parse_method.split("_")[0]):
+            for item in root.iter(self._parse_method.split("_")[0]): #_parse_method=form_original
                 # Split _ to account for only taking the base "form", "line", "word" that is available in the IAM dataset
+                #print(self._parse_method.split("_")[1])
                 if self._parse_method in ["form", "form_bb", "form_original"]:
                     image_id = item.attrib["id"]
                 else:
@@ -151,11 +153,11 @@ class IAMDataset(dataset.ArrayDataset):
                 if image_arr is None:
                     continue
                 output_data = self._get_output_data(item, height, width)
-                #if self._parse_method == "form_bb":
-                #    image_arr, output_data = self._crop_and_resize_form_bb(item, image_arr, output_data, height, width)
+                if self._parse_method == "form_bb":
+                    image_arr, output_data = self._crop_and_resize_form_bb(item, image_arr, output_data, height, width)
                 image_data.append([item.attrib["id"], image_arr, output_data])
         image_data = pd.DataFrame(image_data, columns=["subject", "image", "output"])
-        #self._save_dataframe_chunks(image_data, self.image_data_file_name)
+        #self._save_dataframe_chunks(image_data, self.image_data_file_name) #don't comment line if using pickle
         return image_data    
 
     def _pre_process_image(self, img_in):
@@ -179,11 +181,11 @@ class IAMDataset(dataset.ArrayDataset):
             return None
         # reduce the size of form images so that it can fit in memory.
         if self._parse_method in ["form", "form_bb"]:
-            im, _ = None #resize_image(im, self.MAX_IMAGE_SIZE_FORM) #resize function to be done soon
+            im, _ = resize_image(im, self.MAX_IMAGE_SIZE_FORM) #resize function to be done soon
         if self._parse_method == "line":
-            im, _ = None #resize_image(im, self.MAX_IMAGE_SIZE_LINE)
+            im, _ = resize_image(im, self.MAX_IMAGE_SIZE_LINE)
         if self._parse_method == "word":
-            im, _ = None #resize_image(im, self.MAX_IMAGE_SIZE_WORD)
+            im, _ = resize_image(im, self.MAX_IMAGE_SIZE_WORD)
         img_arr = np.asarray(im)
         return img_arr 
 
@@ -309,6 +311,141 @@ class IAMDataset(dataset.ArrayDataset):
             return new_subject_list
         else:
             return subject_list
+        
+    def _get_bb_of_item(self, item, height, width):
+        ''' Helper function to find the bounding box (bb) of an item in the xml file.
+        All the characters within the item are found and the left-most (min) and right-most (max + length)
+        are found. 
+        The bounding box emcompasses the left and right most characters in the x and y direction. 
+
+        Parameter
+        ---------
+        item: xml.etree object for a word/line/form.
+
+        height: int
+            Height of the form to calculate percentages of bounding boxes
+
+        width: int
+            Width of the form to calculate percentages of bounding boxes
+
+        Returns
+        -------
+        list
+            The bounding box [x, y, w, h] in percentages that encompasses the item.
+        '''
+
+        character_list = [a for a in item.iter("cmp")]
+        if len(character_list) == 0: # To account for some punctuations that have no words
+            return None
+        x1 = np.min([int(a.attrib['x']) for a in character_list])
+        y1 = np.min([int(a.attrib['y']) for a in character_list])
+        x2 = np.max([int(a.attrib['x']) + int(a.attrib['width']) for a in character_list])
+        y2 = np.max([int(a.attrib['y']) + int(a.attrib['height'])for a in character_list])
+
+        x1 = float(x1) / width
+        x2 = float(x2) / width
+        y1 = float(y1) / height
+        y2 = float(y2) / height
+        bb = [x1, y1, x2 - x1, y2 - y1]
+        return bb
+    
+    '''
+           
+    def _save_dataframe_chunks(self, df, name):
+        for i, df_split in enumerate(np.array_split(df, 4)):
+            filename = name[:-5] + str(i) + ".plk" # remove *.plk in the filename
+            df_split.to_pickle(filename, protocol=2)
+            
+    def _load_dataframe_chunks(self, name):
+        image_data_chunks = []
+        for fn in sorted(glob.glob(name)):
+            df = pickle.load(open(fn, 'rb'))
+            image_data_chunks.append(df)
+        image_data = pd.concat(image_data_chunks)
+        return image_data
+        
+    '''
                 
     def __getitem__(self, idx):
         return (self._data[0].iloc[idx].image, self._data[0].iloc[idx].output)
+    
+def crop_image(image, bb):
+    ''' Helper function to crop the image by the bounding box (in percentages)
+    '''
+    (x, y, w, h) = bb
+    x = x * image.shape[1]
+    y = y * image.shape[0]
+    w = w * image.shape[1]
+    h = h * image.shape[0]
+    (x1, y1, x2, y2) = (x, y, x + w, y + h)
+    (x1, y1, x2, y2) = (int(x1), int(y1), int(x2), int(y2))
+    return image[y1:y2, x1:x2]
+
+def resize_image(image, desired_size):
+    ''' Helper function to resize an image while keeping the aspect ratio.
+    Parameter
+    ---------
+    
+    image: np.array
+        The image to be resized.
+
+    desired_size: (int, int)
+        The (height, width) of the resized image
+
+    Return
+    ------
+
+    image: np.array
+        The image of size = desired_size
+
+    bounding box: (int, int, int, int)
+        (x, y, w, h) in percentages of the resized image of the original
+    '''
+    size = image.shape[:2]
+    if size[0] > desired_size[0] or size[1] > desired_size[1]:
+        ratio_w = float(desired_size[0])/size[0]
+        ratio_h = float(desired_size[1])/size[1]
+        ratio = min(ratio_w, ratio_h)
+        new_size = tuple([int(x*ratio) for x in size])
+        image = cv2.resize(image, (new_size[1], new_size[0]))
+        size = image.shape
+            
+    delta_w = max(0, desired_size[1] - size[1])
+    delta_h = max(0, desired_size[0] - size[0])
+    top, bottom = delta_h//2, delta_h-(delta_h//2)
+    left, right = delta_w//2, delta_w-(delta_w//2)
+            
+    color = image[0][0]
+    if color < 230:
+        color = 230
+    image = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=float(color))
+    crop_bb = (left/image.shape[1], top/image.shape[0], (image.shape[1] - right - left)/image.shape[1],
+               (image.shape[0] - bottom - top)/image.shape[0])
+    image[image > 230] = 255
+    return image, crop_bb
+
+def crop_handwriting_page(image, bb, image_size):
+    '''
+    Given an image and bounding box (bb) crop the input image based on the bounding box.
+    The final output image was scaled based on the image size.
+    
+    Parameters
+    ----------
+    image: np.array
+        Input form image
+    
+    bb: (x, y, w, h)
+        The bounding box in percentages to crop
+        
+    image_size: (h, w)
+        Image size to scale the output image to.
+        
+    Returns
+    -------
+    output_image: np.array
+        cropped image of size image_size.
+    '''
+    image = crop_image(image, bb)
+
+    image, _ = resize_image(image, desired_size=image_size)
+    return image
