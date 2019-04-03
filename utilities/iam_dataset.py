@@ -99,17 +99,17 @@ class IAMDataset(dataset.ArrayDataset):
 
         '''
         
-        print("Get data")
+        #print("Get data")
         
-        '''
+        
 
         if len(glob.glob(self.image_data_file_name)) > 0:
             logging.info("Loading data from pickle")
             images_data = self._load_dataframe_chunks(self.image_data_file_name)
         else:
             images_data = self._process_data()
-        '''
-        images_data = self._process_data() #comment this line if using pickle
+        
+        #images_data = self._process_data() #comment this line if using pickle
 
         # Extract train or test data out
         train_subjects, test_subjects = self._process_subjects()
@@ -157,7 +157,7 @@ class IAMDataset(dataset.ArrayDataset):
                     image_arr, output_data = self._crop_and_resize_form_bb(item, image_arr, output_data, height, width)
                 image_data.append([item.attrib["id"], image_arr, output_data])
         image_data = pd.DataFrame(image_data, columns=["subject", "image", "output"])
-        #self._save_dataframe_chunks(image_data, self.image_data_file_name) #don't comment line if using pickle
+        self._save_dataframe_chunks(image_data, self.image_data_file_name) #don't comment line if using pickle
         return image_data    
 
     def _pre_process_image(self, img_in):
@@ -259,7 +259,7 @@ class IAMDataset(dataset.ArrayDataset):
             A list of subjects used for testing
         '''
       
-        print("Processing subjects")
+        #print("Processing subjects")
         train_subjects = []
         test_subjects = []
         for train_list in train_subject_lists:
@@ -349,7 +349,7 @@ class IAMDataset(dataset.ArrayDataset):
         bb = [x1, y1, x2 - x1, y2 - y1]
         return bb
     
-    '''
+    
            
     def _save_dataframe_chunks(self, df, name):
         for i, df_split in enumerate(np.array_split(df, 4)):
@@ -364,7 +364,7 @@ class IAMDataset(dataset.ArrayDataset):
         image_data = pd.concat(image_data_chunks)
         return image_data
         
-    '''
+    
                 
     def __getitem__(self, idx):
         return (self._data[0].iloc[idx].image, self._data[0].iloc[idx].output)
