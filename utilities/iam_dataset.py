@@ -103,11 +103,13 @@ class IAMDataset(dataset.ArrayDataset):
         
         
 
+        
         if len(glob.glob(self.image_data_file_name)) > 0:
             logging.info("Loading data from pickle")
             images_data = self._load_dataframe_chunks(self.image_data_file_name)
         else:
             images_data = self._process_data()
+        
         
         #images_data = self._process_data() #comment this line if using pickle
 
@@ -348,6 +350,81 @@ class IAMDataset(dataset.ArrayDataset):
         y2 = float(y2) / height
         bb = [x1, y1, x2 - x1, y2 - y1]
         return bb
+
+    def _crop_and_resize_form_bb(self, item, image_arr, output_data, height, width):
+        bb = self._get_bb_of_item(item, height, width)
+
+        # Expand the form bounding box by 5%
+        expand_bb_scale = 0.05
+        new_w = (1 + expand_bb_scale) * bb[2]
+        new_h = (1 + expand_bb_scale) * bb[3]
+        
+        bb[0] = bb[0] - (new_w - bb[2])/2
+        bb[1] = bb[1] - (new_h - bb[3])/2
+        bb[2] = new_w
+        bb[3] = new_h
+
+        image_arr_bb = crop_image(image_arr, bb)
+
+        if self._output_data == "bb":            
+            output_data = self._change_bb_reference(output_data, bb, image_arr.shape, image_arr.shape, image_arr_bb.shape, "minus")
+
+        image_arr_bb_, bb = resize_image(image_arr_bb, desired_size=(700, 700))
+
+        if self._output_data == "bb":
+            output_data = self._change_bb_reference(output_data, bb, image_arr_bb.shape, image_arr_bb_.shape, image_arr_bb_.shape, "plus")
+        image_arr = image_arr_bb_
+        return image_arr, output_data
+
+    def _change_bb_reference(self, bb, relative_bb, bb_reference_size, relative_bb_reference_size, output_size, operator):
+        ''' Helper function to convert bounding boxes relative into another bounding bounding box.
+        Parameter
+        --------
+        bb: [[int, int, int, int]]
+            Bounding boxes (x, y, w, h) in percentages to be converted.
+
+        relative_bb: [int, int, int, int]
+            Reference bounding box (in percentages) to convert bb to 
+
+        bb_reference_size: (int, int)
+            Size (h, w) in pixels of the image containing bb
+
+        relative_bb_reference_size: (int, int)
+            Size (h, w) in pixels of the image containing relative_bb
+
+        output_size: (int, int)
+            Size (h, w) in pixels of the output image
+
+        operator: string
+            Options ["plus", "minus"]. "plus" if relative_bb is within bb and "minus" if bb is within relative_bb
+
+        Returns
+        -------
+        bb: [[int, int, int, int]]
+            Bounding boxes (x, y, w, h) in percentages that are converted
+        
+        '''        
+        (x1, y1, x2, y2) = (bb[:, 0], bb[:, 1], bb[:, 0] + bb[:, 2], bb[:, 1] + bb[:, 3])
+        (x1, y1, x2, y2) = (x1 * bb_reference_size[1], y1 * bb_reference_size[0],
+                            x2 * bb_reference_size[1], y2 * bb_reference_size[0])
+
+        if operator == "plus":
+            new_x1 = (x1 + relative_bb[0] * relative_bb_reference_size[1]) / output_size[1]
+            new_y1 = (y1 + relative_bb[1] * relative_bb_reference_size[0]) / output_size[0]
+            new_x2 = (x2 + relative_bb[0] * relative_bb_reference_size[1]) / output_size[1]
+            new_y2 = (y2 + relative_bb[1] * relative_bb_reference_size[0]) / output_size[0]
+        else:
+            new_x1 = (x1 - relative_bb[0] * relative_bb_reference_size[1]) / output_size[1]
+            new_y1 = (y1 - relative_bb[1] * relative_bb_reference_size[0]) / output_size[0]
+            new_x2 = (x2 - relative_bb[0] * relative_bb_reference_size[1]) / output_size[1]
+            new_y2 = (y2 - relative_bb[1] * relative_bb_reference_size[0]) / output_size[0]
+
+        new_bbs = np.zeros(shape=bb.shape)
+        new_bbs[:, 0] = new_x1
+        new_bbs[:, 1] = new_y1
+        new_bbs[:, 2] = new_x2 - new_x1
+        new_bbs[:, 3] = new_y2 - new_y1
+        return new_bbs
     
     
            
