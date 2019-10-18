@@ -27,6 +27,7 @@ Here is the architecture of the DCNN model.
 
 The model gives 4 values as output in the end, (x,y,w,h). (x,y) are the coordinates of the starting of the paragraph that the model has recognized, w is the width of the paragraph and h is the height of the paragraph. Using this parameters, a bounding box can be formed around the paragraph to successfully segment the paragraph from the given image.
 
+<br/>
 
 ## Line Segmentation
 Similarly, line segmentation is done through pre-processing, feature extraction and segmentation. Line Segmentation is used to identify the lines present in the paragraph. This is important as many people have a tendency to not write in a straight line.
@@ -36,6 +37,7 @@ Here is the architecture of the SSD network model.
 
 The model contains a list of bounding boxes each containing 4 values as output in the end, [n][(x,y,w,h)]. n is the number of words detected in the paragraph, (x,y) are the coordinates of the starting of the word that the model has recognized, w is the width of the word and h is the height of the word. Using this parameters, a bounding box can be formed around each word to successfully detect the words from the given image to segment to lines (checks if y coordinate of the bounding boxes overlap each other).
 
+<br/>
 
 ## Handwriting Recognition
 The final model is the handwriting recognition model which takes a line as input and converts the line into digital text. This model consits of a CNN-biLSTM architecture. The loss used is the CTC (Connectionist Temporal Classification) loss. 
