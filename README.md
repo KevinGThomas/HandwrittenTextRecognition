@@ -2,7 +2,7 @@
 Recognizing Handwritten Text by segmenting the page into paragraphs and lines and then converting them to digital text.
 
 # Overview
-This is the full code for 'Handwritten Text Recognition'. This code helps to convert a handwritten page into digital text by identifying the paragraph present in the page, segmenting the lines and running handwriting recognition to accurately identify the text.
+This is the full code for 'Handwritten Text Recognition'. This code helps to convert a handwritten page into digital text by identifying the paragraph present in the page, segmenting the lines and running handwriting recognition to accurately identify the text. The dataset used is the IAMDataset (http://www.fki.inf.unibe.ch/databases/iam-handwriting-database) containing about 6,000 labeled sentences and about 120,000 labeled words. 
 
 # Dependency
 * mxnet
